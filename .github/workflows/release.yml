@@ -40,22 +40,38 @@ jobs:
           Compress-Archive -Path "dist\Ice Unpacker.exe", README.md -DestinationPath $zipName -Force
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
 
+      - name: Build release notes
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.version }}"
+          $out = @("### What's new in $ver", "")
+          $on = $false
+          foreach ($l in Get-Content README.md) {
+            if ($l -match '^### ') { $on = ($l.Trim() -eq "### $ver"); continue }
+            if ($l -match '^## ' -and $on) { break }
+            if ($on) { $out += $l }
+          }
+          $out += @(
+            '',
+            'Pre-built Windows binary for Ice Unpacker. Source code is available separately in the repository.',
+            '',
+            '### Installation',
+            "1. Download ``Ice-Unpacker-$ver-windows-x64.zip``",
+            '2. Extract and run `Ice Unpacker.exe` — no installation required.',
+            '',
+            '### Requirements',
+            '- Windows 10/11 x64',
+            '',
+            '### Usage',
+            '- **GUI:** Double-click `Ice Unpacker.exe`, browse to your packed .prg file, click Unpack',
+            '- **CLI:** `"Ice Unpacker.exe" packed.prg [-o out.prg] [--identify]`'
+          )
+          $out | Set-Content -Path release-notes.md -Encoding utf8
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2.3.2
         with:
           tag_name: ${{ inputs.version }}
           name: "Ice Unpacker ${{ inputs.version }}"
-          body: |
-            Pre-built Windows binary for Ice Unpacker. Source code is available separately in the repository.
-
-            ### Installation
-            1. Download `Ice-Unpacker-${{ inputs.version }}-windows-x64.zip`
-            2. Extract and run `Ice Unpacker.exe` — no installation required.
-
-            ### Requirements
-            - Windows 10/11 x64
-
-            ### Usage
-            - **GUI:** Double-click `Ice Unpacker.exe`, browse to your packed .prg file, click Unpack
-            - **CLI:** `"Ice Unpacker.exe" packed.prg [-o out.prg] [--identify]`
+          body_path: release-notes.md
           files: ${{ env.ZIP_NAME }}
