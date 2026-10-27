@@ -2,7 +2,16 @@
 
 ![Ice Unpacker](app_image.jpg)
 
-Unpacks Atari ST executables packed with Pack-Ice (the "ICE!" signature format). Produces the same result as unpacking with Ice on a real ST — a standard, runnable TOS executable.
+Unpacks Atari ST executables packed with Pack-Ice (the "ICE!" / "Ice!" signature format). Produces the same result as unpacking with Ice on a real ST — a standard, runnable TOS executable.
+
+## What's New
+
+### v1.0.1
+- **Fixed:** files whose signature is spelled `Ice!` (mixed case) were rejected with "Not an Ice Packer file". Both `ICE!` and `Ice!` are recognised now; the compressed format is identical. Found on a Pack-Ice 2.x executable whose payload header read `Ice!`.
+- **Improved:** on the command line, a file that isn't Ice-packed (or can't be read) now prints a one-line error and exits with code 1 instead of a Python traceback.
+
+### v1.0.0
+- First release.
 
 ## Requirements
 
@@ -40,14 +49,14 @@ python ice_unpacker.py {filename}.prg --identify
 
 ## Supported Packers
 
-- Pack-Ice ("ICE!" signature)
+- Pack-Ice ("ICE!" or "Ice!" signature)
 
 **Not supported:** PFX/PFXPAK, Synergy, UPX, or other non-Ice packers.
 **Not supported:** generic LHA archives (use lhasa for those).
 
 ## How It Works
 
-1. Locates the "ICE!" signature in the file
+1. Locates the "ICE!" (or "Ice!") signature in the file
 2. Reads the unpacked size from the block header
 3. Runs the reverse (end-to-start) LZ77-style decompressor, reconstructing literal runs and back-references from a bit-reversed, unary-prefix-coded bitstream
 4. Writes the decompressed content — which is already a complete TOS file (header + text + data + relocation table) — directly to disk

@@ -42,7 +42,8 @@ def _resource_path(name: str) -> Path:
     return base / name
 
 
-ICE_SIGNATURE = 0x49434521  # "ICE!"
+# The signature is normally "ICE!"; some Pack-Ice 2.x executables spell it "Ice!". The payload format is the same.
+ICE_SIGNATURES = (b"ICE!", b"Ice!")
 
 
 # ---------------------------------------------------------------------------
@@ -50,14 +51,15 @@ ICE_SIGNATURE = 0x49434521  # "ICE!"
 # ---------------------------------------------------------------------------
 
 def find_ice_signature(data: bytes) -> int:
-    """Returns the byte offset of the 'ICE!' signature, or -1 if not found."""
-    return data.find(struct.pack(">I", ICE_SIGNATURE))
+    """Returns the byte offset of the earliest 'ICE!' / 'Ice!' signature, or -1 if not found."""
+    hits = [i for i in (data.find(sig) for sig in ICE_SIGNATURES) if i >= 0]
+    return min(hits) if hits else -1
 
 
 def identify_ice(data: bytes) -> dict:
     offset = find_ice_signature(data)
     if offset == -1:
-        raise ValueError("Not an Ice Packer file ('ICE!' signature not found)")
+        raise ValueError("Not an Ice Packer file ('ICE!' / 'Ice!' signature not found)")
     span, unpacked_len = struct.unpack_from(">II", data, offset + 4)
     if offset + span > len(data):
         raise ValueError("Ice header span runs past end of file -- corrupt or not Ice-packed")
@@ -224,18 +226,22 @@ def run_cli(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 1
 
-    packed = args.input.read_bytes()
+    try:
+        packed = args.input.read_bytes()
 
-    if args.identify:
-        info = identify_ice(packed)
-        print(f"ICE! signature at : offset {info['offset']}")
-        print(f"Compressed span    : {info['span']:,} bytes")
-        print(f"Unpacked length    : {info['unpacked_len']:,} bytes")
-        print(f"Packed file size   : {len(packed):,} bytes")
-        return 0
+        if args.identify:
+            info = identify_ice(packed)
+            print(f"ICE! signature at : offset {info['offset']}")
+            print(f"Compressed span    : {info['span']:,} bytes")
+            print(f"Unpacked length    : {info['unpacked_len']:,} bytes")
+            print(f"Packed file size   : {len(packed):,} bytes")
+            return 0
 
-    output = args.output or args.input.with_name(args.input.stem + "_unpacked.prg")
-    src_size, dest_size, info = unpack_file(args.input, output)
+        output = args.output or args.input.with_name(args.input.stem + "_unpacked.prg")
+        src_size, dest_size, info = unpack_file(args.input, output)
+    except (OSError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     print(f"Unpacked    : {output} ({dest_size:,} bytes)")
     print(f"From        : {args.input} ({src_size:,} bytes packed, "
           f"{info['span']:,} bytes compressed span)")
